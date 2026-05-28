@@ -55,7 +55,7 @@ jobs:
             require("resty.openssl.x509")
             print("lua libs OK")'
           docker run --rm openresty-edge:test resty \
-            --http-include 'lua_package_path "/usr/local/openresty/lualib/plugins/crowdsec/?.lua;;";' \
+            -I /usr/local/openresty/lualib/plugins/crowdsec \
             -e 'require("crowdsec"); print("crowdsec lib OK")'
 
       - name: config with brotli + HTTP/3 passes nginx -t
