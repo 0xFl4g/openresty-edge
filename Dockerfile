@@ -18,9 +18,10 @@
 
 # ---- versions (override with --build-arg; CI pins these) --------------------
 ARG RESTY_VERSION=1.27.1.2
-# quictls: OpenSSL fork carrying the QUIC API. VERIFY the branch against
-# https://github.com/quictls/openssl/branches before cutting a release tag.
-ARG QUICTLS_BRANCH=openssl-3.3+quic
+# quictls: OpenSSL fork carrying the QUIC API. Real branch names look like
+# `openssl-3.3.0+quic` (not `openssl-3.3+quic`). 3.3.0 aligns with alpine 3.20's
+# OpenSSL 3.3 line used at runtime for lua-resty-openssl's FFI.
+ARG QUICTLS_BRANCH=openssl-3.3.0+quic
 # ngx_brotli has no recent tagged release — pin a commit for reproducible
 # builds. Refresh from https://github.com/google/ngx_brotli/commits/master
 ARG NGX_BROTLI_REF=master
