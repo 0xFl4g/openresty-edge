@@ -46,8 +46,8 @@ ARG LUA_CS_BOUNCER_VERSION
 ARG LUA_RESTY_HTTP_VERSION
 
 RUN apk add --no-cache \
-      build-base cmake perl linux-headers \
-      pcre2-dev zlib-dev \
+      build-base perl linux-headers \
+      pcre2-dev zlib-dev brotli-dev \
       curl git bash \
       readline-dev ncurses-dev
 
@@ -57,11 +57,13 @@ WORKDIR /src
 RUN git clone --depth 1 --branch "${QUICTLS_BRANCH}" \
       https://github.com/quictls/openssl.git quictls
 
-# --- ngx_brotli (+ the bundled brotli submodule) -----------------------------
-RUN git clone --recurse-submodules --shallow-submodules \
-      https://github.com/google/ngx_brotli.git ngx_brotli \
- && git -C ngx_brotli checkout "${NGX_BROTLI_REF}" \
- && git -C ngx_brotli submodule update --init --recursive
+# --- ngx_brotli (links against the system libbrotli from brotli-dev) ----------
+# No submodule: with brotli-dev present, ngx_brotli's config links the shared
+# -lbrotlienc / -lbrotlidec / -lbrotlicommon (the dynamic-module path can't use
+# the bundled static brotli). brotli-libs is installed in the runtime stage so
+# the .so can load.
+RUN git clone https://github.com/google/ngx_brotli.git ngx_brotli \
+ && git -C ngx_brotli checkout "${NGX_BROTLI_REF}"
 
 # --- OpenResty source --------------------------------------------------------
 RUN curl -fsSL "https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz" \
@@ -86,7 +88,7 @@ RUN cd "openresty-${RESTY_VERSION}" \
       --with-http_gunzip_module \
       --with-luajit \
       --with-openssl=/src/quictls \
-      --with-openssl-opt='enable-tls1_3' \
+      --with-openssl-opt='no-tests' \
       --add-dynamic-module=/src/ngx_brotli \
       -j"$(nproc)" \
  && make -j"$(nproc)" \
@@ -143,7 +145,7 @@ FROM alpine:3.20
 # needs *a* shared 3.x libcrypto for cert/key parsing. `gettext` provides
 # envsubst (used to template the bouncer config at container start).
 RUN apk add --no-cache \
-      pcre2 zlib libstdc++ libgcc \
+      pcre2 zlib brotli-libs libstdc++ libgcc \
       openssl ca-certificates \
       bash curl gettext tzdata \
  && mkdir -p /var/run/openresty /var/log/openresty /etc/openresty/conf.d
