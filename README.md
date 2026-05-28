@@ -120,7 +120,6 @@ A config template is at
 | `RESTY_VERSION` | `1.27.1.2` | OpenResty release |
 | `QUICTLS_BRANCH` | `openssl-3.3+quic` | quictls branch |
 | `NGX_BROTLI_REF` | `master` | pin a commit for reproducibility |
-| `LUAROCKS_VERSION` | `3.11.1` | |
 | `LUA_CS_BOUNCER_VERSION` | `v1.0.14` | CrowdSec bouncer lib |
 
 ```bash
