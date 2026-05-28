@@ -1,0 +1,87 @@
+name: test
+
+# Fast amd64 smoke test on every push / PR. Builds the image locally and
+# asserts the three things that justify this image existing — HTTP/3, brotli,
+# and the baked Lua libraries — actually load. A green build that can't serve
+# h3 or can't require resty.acme is worse than a red one.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (amd64, load locally)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: openresty-edge:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: openresty -V shows HTTP/3 + QUIC
+        run: |
+          docker run --rm openresty-edge:test openresty -V 2>&1 | tee /tmp/v.txt
+          grep -q -- '--with-http_v3_module' /tmp/v.txt
+          grep -qi 'quic' /tmp/v.txt
+
+      - name: brotli dynamic modules present
+        run: |
+          docker run --rm openresty-edge:test \
+            sh -c 'ls -1 /usr/local/openresty/nginx/modules/ngx_http_brotli_*.so'
+
+      - name: baked Lua libraries require cleanly
+        run: |
+          # resty CLI default path includes site/lualib (where we copied the
+          # rocks) + lualib. crowdsec lives under lualib/plugins/crowdsec, so
+          # add it explicitly for the require check.
+          docker run --rm openresty-edge:test resty -e '
+            require("resty.http")
+            require("resty.acme.autossl")
+            require("resty.openssl.x509")
+            print("lua libs OK")'
+          docker run --rm openresty-edge:test resty \
+            --http-include 'lua_package_path "/usr/local/openresty/lualib/plugins/crowdsec/?.lua;;";' \
+            -e 'require("crowdsec"); print("crowdsec lib OK")'
+
+      - name: config with brotli + HTTP/3 passes nginx -t
+        run: |
+          cat > /tmp/test.conf <<'CONF'
+          worker_processes 1;
+          error_log /dev/stderr warn;
+          pid /var/run/openresty/nginx.pid;
+          load_module modules/ngx_http_brotli_filter_module.so;
+          load_module modules/ngx_http_brotli_static_module.so;
+          events { worker_connections 256; }
+          http {
+            brotli on;
+            brotli_types text/plain application/json;
+            server {
+              listen 8443 quic reuseport;
+              listen 8443 ssl;
+              http3 on;
+              server_name _;
+              ssl_certificate     /tmp/t.crt;
+              ssl_certificate_key /tmp/t.key;
+              location / { return 200 "ok\n"; }
+            }
+          }
+          CONF
+          docker run --rm -v /tmp/test.conf:/tmp/test.conf:ro openresty-edge:test sh -c '
+            openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+              -keyout /tmp/t.key -out /tmp/t.crt -subj "/CN=test" 2>/dev/null
+            openresty -p /usr/local/openresty -c /tmp/test.conf -t'

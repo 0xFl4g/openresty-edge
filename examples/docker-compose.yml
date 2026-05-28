@@ -1,0 +1,16 @@
+# Minimal openresty-edge usage example.
+#   docker compose up
+#   curl -k https://localhost/
+#   curl -k --http3 https://localhost/        # if your curl has HTTP/3
+services:
+  edge:
+    image: ghcr.io/0xfl4g/openresty-edge:latest
+    ports:
+      - "8080:80"
+      - "8443:443"
+      - "8443:443/udp"          # HTTP/3 needs UDP
+    volumes:
+      - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+    # The image runs `openresty -g 'daemon off;'` by default.
+
+# See ./nginx.conf in this directory for a brotli + HTTP/3 starting point.
