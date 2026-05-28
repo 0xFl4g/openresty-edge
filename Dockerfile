@@ -18,10 +18,13 @@
 
 # ---- versions (override with --build-arg; CI pins these) --------------------
 ARG RESTY_VERSION=1.27.1.2
-# quictls: OpenSSL fork carrying the QUIC API. Real branch names look like
-# `openssl-3.3.0+quic` (not `openssl-3.3+quic`). 3.3.0 aligns with alpine 3.20's
-# OpenSSL 3.3 line used at runtime for lua-resty-openssl's FFI.
-ARG QUICTLS_BRANCH=openssl-3.3.0+quic
+# quictls: OpenSSL fork carrying the QUIC API. Use the 3.1.x+quic LTS line —
+# it's the canonical, known-to-compile branch for nginx HTTP/3 builds. The
+# 3.3.0+quic branch fails to compile on modern gcc (ssl_quic.c bug) and quictls
+# wound down the 3.3 line in favour of OpenSSL 3.5's native QUIC. nginx's static
+# quictls and the runtime's alpine libcrypto (3.3, for lua-resty-openssl FFI)
+# are independent, so the version skew is fine.
+ARG QUICTLS_BRANCH=openssl-3.1.8+quic
 # ngx_brotli has no recent tagged release — pin a commit for reproducible
 # builds. Refresh from https://github.com/google/ngx_brotli/commits/master
 ARG NGX_BROTLI_REF=master
