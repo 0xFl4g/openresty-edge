@@ -48,7 +48,7 @@ ARG LUA_RESTY_HTTP_VERSION
 RUN apk add --no-cache \
       build-base perl linux-headers \
       pcre2-dev zlib-dev brotli-dev \
-      curl git bash \
+      curl wget git bash ca-certificates \
       readline-dev ncurses-dev
 
 WORKDIR /src
