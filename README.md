@@ -118,8 +118,8 @@ A config template is at
 | Arg | Default | Notes |
 |-----|---------|-------|
 | `RESTY_VERSION` | `1.27.1.2` | OpenResty release |
-| `QUICTLS_BRANCH` | `openssl-3.3+quic` | quictls branch |
-| `NGX_BROTLI_REF` | `master` | pin a commit for reproducibility |
+| `QUICTLS_BRANCH` | `openssl-3.1.8+quic` | quictls branch (3.1.x LTS line; 3.3.0+quic fails to compile) |
+| `NGX_BROTLI_REF` | pinned commit | `a71f9312…` — refresh from upstream master |
 | `LUA_CS_BOUNCER_VERSION` | `v1.0.14` | CrowdSec bouncer lib |
 
 ```bash
@@ -128,8 +128,9 @@ docker build --build-arg RESTY_VERSION=1.27.1.2 -t openresty-edge:local .
 
 ## Notes
 
-- **Build time**: this is a from-source OpenResty + quictls compile. The arm64
-  CI leg runs under QEMU and is slow (tens of minutes); cached rebuilds are fast.
+- **Build time**: this is a from-source OpenResty + quictls compile. CI builds
+  each arch on its own native GitHub runner (amd64 + arm64, no QEMU) — ~4 min
+  per arch; cached rebuilds are faster.
 - **Why third-party**: there's no official OpenResty image with HTTP/3 + Brotli.
   This packages the well-trodden from-source recipe so you don't have to.
 

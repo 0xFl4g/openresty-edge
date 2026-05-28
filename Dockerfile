@@ -25,9 +25,9 @@ ARG RESTY_VERSION=1.27.1.2
 # quictls and the runtime's alpine libcrypto (3.3, for lua-resty-openssl FFI)
 # are independent, so the version skew is fine.
 ARG QUICTLS_BRANCH=openssl-3.1.8+quic
-# ngx_brotli has no recent tagged release — pin a commit for reproducible
+# ngx_brotli has no recent tagged release — pinned to a commit for reproducible
 # builds. Refresh from https://github.com/google/ngx_brotli/commits/master
-ARG NGX_BROTLI_REF=master
+ARG NGX_BROTLI_REF=a71f9312c2deb28875acc7bacfdd5695a111aa53
 # Match crowdsecurity/cs-openresty-bouncer's pinned lib version.
 ARG LUA_CS_BOUNCER_VERSION=v1.0.14
 ARG LUA_RESTY_HTTP_VERSION=0.17.1-0
