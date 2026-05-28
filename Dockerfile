@@ -57,13 +57,16 @@ WORKDIR /src
 RUN git clone --depth 1 --branch "${QUICTLS_BRANCH}" \
       https://github.com/quictls/openssl.git quictls
 
-# --- ngx_brotli (links against the system libbrotli from brotli-dev) ----------
-# No submodule: with brotli-dev present, ngx_brotli's config links the shared
-# -lbrotlienc / -lbrotlidec / -lbrotlicommon (the dynamic-module path can't use
-# the bundled static brotli). brotli-libs is installed in the runtime stage so
-# the .so can load.
-RUN git clone https://github.com/google/ngx_brotli.git ngx_brotli \
- && git -C ngx_brotli checkout "${NGX_BROTLI_REF}"
+# --- ngx_brotli -------------------------------------------------------------
+# Needs BOTH: the bundled submodule (ngx_brotli's config hard-requires
+# deps/brotli/c or it errors) AND the system brotli-dev (the *dynamic* module's
+# link line references shared -lbrotlienc/-lbrotlidec/-lbrotlicommon regardless
+# of the bundled sources). brotli-libs is installed in the runtime stage so the
+# .so can load. Pin NGX_BROTLI_REF to a commit for reproducible releases.
+RUN git clone --recurse-submodules --shallow-submodules \
+      https://github.com/google/ngx_brotli.git ngx_brotli \
+ && git -C ngx_brotli checkout "${NGX_BROTLI_REF}" \
+ && git -C ngx_brotli submodule update --init --recursive
 
 # --- OpenResty source --------------------------------------------------------
 RUN curl -fsSL "https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz" \
