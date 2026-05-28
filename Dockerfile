@@ -142,7 +142,7 @@ FROM alpine:3.20
 RUN apk add --no-cache \
       pcre2 zlib brotli-libs libstdc++ libgcc \
       openssl ca-certificates \
-      bash curl gettext tzdata \
+      bash curl gettext tzdata perl \
  && mkdir -p /var/run/openresty /var/log/openresty /etc/openresty/conf.d
 
 COPY --from=build /usr/local/openresty /usr/local/openresty
