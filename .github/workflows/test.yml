@@ -11,6 +11,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  # Run JS actions on Node 24 now (GitHub forces this 2026-06-02).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   smoke:
     runs-on: ubuntu-latest

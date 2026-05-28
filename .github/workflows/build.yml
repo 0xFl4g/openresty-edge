@@ -33,6 +33,9 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: openresty-edge
+  # Run JS actions on Node 24 now (GitHub forces this 2026-06-02; silences the
+  # Node 20 deprecation warning without guessing per-action version bumps).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:

@@ -17,6 +17,7 @@
 # =============================================================================
 
 # ---- versions (override with --build-arg; CI pins these) --------------------
+# renovate: datasource=github-tags depName=openresty/openresty extractVersion=^v(?<version>.+)$
 ARG RESTY_VERSION=1.27.1.2
 # quictls: OpenSSL fork carrying the QUIC API. Use the 3.1.x+quic LTS line —
 # it's the canonical, known-to-compile branch for nginx HTTP/3 builds. The
@@ -29,6 +30,7 @@ ARG QUICTLS_BRANCH=openssl-3.1.8+quic
 # builds. Refresh from https://github.com/google/ngx_brotli/commits/master
 ARG NGX_BROTLI_REF=a71f9312c2deb28875acc7bacfdd5695a111aa53
 # Match crowdsecurity/cs-openresty-bouncer's pinned lib version.
+# renovate: datasource=github-tags depName=crowdsecurity/lua-cs-bouncer
 ARG LUA_CS_BOUNCER_VERSION=v1.0.14
 ARG LUA_RESTY_HTTP_VERSION=0.17.1-0
 
