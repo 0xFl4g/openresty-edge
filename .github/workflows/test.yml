@@ -81,7 +81,10 @@ jobs:
             }
           }
           CONF
+          # No -p: use the compiled default prefix (/usr/local/openresty/nginx),
+          # so `load_module modules/...` resolves to nginx/modules/ where the
+          # brotli .so lives — same path real consumer configs use.
           docker run --rm -v /tmp/test.conf:/tmp/test.conf:ro openresty-edge:test sh -c '
             openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
               -keyout /tmp/t.key -out /tmp/t.crt -subj "/CN=test" 2>/dev/null
-            openresty -p /usr/local/openresty -c /tmp/test.conf -t'
+            openresty -c /tmp/test.conf -t'
