@@ -1,16 +1,19 @@
-# Minimal openresty-edge usage example.
+# Minimal openresty-edge usage example. Generate a self-signed cert first
+# (see ./nginx.conf header for the openssl one-liner), then:
 #   docker compose up
-#   curl -k https://localhost/
-#   curl -k --http3 https://localhost/        # if your curl has HTTP/3
+#   curl -k https://localhost:8443/
+#   curl -k --http3 https://localhost:8443/   # if your curl has HTTP/3
 services:
   edge:
     image: ghcr.io/0xfl4g/openresty-edge:latest
     ports:
-      - "8080:80"
-      - "8443:443"
-      - "8443:443/udp"          # HTTP/3 needs UDP
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:443"
+      - "127.0.0.1:8443:443/udp"    # HTTP/3 needs UDP
     volumes:
       - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./cert.pem:/etc/openresty/cert.pem:ro
+      - ./key.pem:/etc/openresty/key.pem:ro
     # The image runs `openresty -g 'daemon off;'` by default.
 
 # See ./nginx.conf in this directory for a brotli + HTTP/3 starting point.
