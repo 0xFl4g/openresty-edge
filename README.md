@@ -121,6 +121,8 @@ A config template is at
 | `QUICTLS_BRANCH` | `openssl-3.1.8+quic` | quictls branch (3.1.x LTS line; 3.3.0+quic fails to compile) |
 | `NGX_BROTLI_REF` | pinned commit | `a71f9312…` — refresh from upstream master |
 | `LUA_CS_BOUNCER_VERSION` | `v1.0.14` | CrowdSec bouncer lib |
+| `LUA_RESTY_HTTP_VERSION` | `0.17.1-0` | luarocks rock version (matches the bouncer's expectation) |
+| `LUA_RESTY_ACME_VERSION` | `0.16.0-1` | luarocks rock version |
 
 ```bash
 docker build --build-arg RESTY_VERSION=1.27.1.2 -t openresty-edge:local .

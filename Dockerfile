@@ -23,7 +23,7 @@ ARG RESTY_VERSION=1.27.1.2
 # it's the canonical, known-to-compile branch for nginx HTTP/3 builds. The
 # 3.3.0+quic branch fails to compile on modern gcc (ssl_quic.c bug) and quictls
 # wound down the 3.3 line in favour of OpenSSL 3.5's native QUIC. nginx's static
-# quictls and the runtime's alpine libcrypto (3.3, for lua-resty-openssl FFI)
+# quictls and the runtime's alpine libcrypto (3.5, for lua-resty-openssl FFI)
 # are independent, so the version skew is fine.
 ARG QUICTLS_BRANCH=openssl-3.1.8+quic
 # ngx_brotli has no recent tagged release — pinned to a commit for reproducible
@@ -32,18 +32,22 @@ ARG NGX_BROTLI_REF=a71f9312c2deb28875acc7bacfdd5695a111aa53
 # Match crowdsecurity/cs-openresty-bouncer's pinned lib version.
 # renovate: datasource=github-tags depName=crowdsecurity/lua-cs-bouncer
 ARG LUA_CS_BOUNCER_VERSION=v1.0.14
+# luarocks versions (X.Y.Z-<rockrev>) — no renovate datasource; refresh from
+# https://luarocks.org/modules/fffonion
 ARG LUA_RESTY_HTTP_VERSION=0.17.1-0
+ARG LUA_RESTY_ACME_VERSION=0.16.0-1
 
 # =============================================================================
 # Stage 1 — build
 # =============================================================================
-FROM alpine:3.20 AS build
+FROM alpine:3.22 AS build
 
 ARG RESTY_VERSION
 ARG QUICTLS_BRANCH
 ARG NGX_BROTLI_REF
 ARG LUA_CS_BOUNCER_VERSION
 ARG LUA_RESTY_HTTP_VERSION
+ARG LUA_RESTY_ACME_VERSION
 
 RUN apk add --no-cache \
       build-base perl linux-headers \
@@ -113,7 +117,7 @@ ENV PATH=/usr/local/openresty/luajit/bin:/usr/local/openresty/bin:/usr/local/ope
 # don't special-case lua_package_path for resty.acme/http/openssl). lua-resty-http
 # is pinned to match the version the CrowdSec bouncer expects.
 RUN luarocks-5.1 install --tree /tmp/rocks lua-resty-http "${LUA_RESTY_HTTP_VERSION}" \
- && luarocks-5.1 install --tree /tmp/rocks lua-resty-acme \
+ && luarocks-5.1 install --tree /tmp/rocks lua-resty-acme "${LUA_RESTY_ACME_VERSION}" \
  && mkdir -p /usr/local/openresty/site/lualib \
  && cp -R /tmp/rocks/share/lua/5.1/. /usr/local/openresty/site/lualib/ \
  && rm -rf /tmp/rocks
@@ -134,7 +138,7 @@ RUN git clone --depth 1 --branch "${LUA_CS_BOUNCER_VERSION}" \
 # =============================================================================
 # Stage 2 — runtime
 # =============================================================================
-FROM alpine:3.20
+FROM alpine:3.22
 
 # Runtime libs. `openssl` provides the shared libssl.so.3 / libcrypto.so.3 that
 # lua-resty-openssl FFI-loads (lua-resty-acme depends on it). nginx itself uses
