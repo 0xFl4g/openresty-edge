@@ -8,7 +8,13 @@ name: test
 on:
   push:
     branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/test.yml'
   pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 env:
@@ -34,8 +40,10 @@ jobs:
           push: false
           load: true
           tags: openresty-edge:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Same scope as build.yml's amd64 leg so the smoke test reuses (and
+          # warms) the release build's layer cache instead of recompiling.
+          cache-from: type=gha,scope=linux-amd64
+          cache-to: type=gha,mode=max,scope=linux-amd64
 
       - name: openresty -V shows HTTP/3 + QUIC
         run: |
