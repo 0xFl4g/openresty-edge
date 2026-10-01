@@ -40,7 +40,7 @@ ARG LUA_RESTY_ACME_VERSION=0.16.0-1
 # =============================================================================
 # Stage 1 — build
 # =============================================================================
-FROM alpine:3.22 AS build
+FROM alpine:3.24 AS build
 
 ARG RESTY_VERSION
 ARG QUICTLS_BRANCH
@@ -141,7 +141,7 @@ RUN git clone --depth 1 --branch "${LUA_CS_BOUNCER_VERSION}" \
 # =============================================================================
 # Stage 2 — runtime
 # =============================================================================
-FROM alpine:3.22
+FROM alpine:3.24
 
 # Runtime libs. `openssl` provides the shared libssl.so.3 / libcrypto.so.3 that
 # lua-resty-openssl FFI-loads (lua-resty-acme depends on it). nginx itself uses
