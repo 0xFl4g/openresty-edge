@@ -31,7 +31,7 @@ ARG QUICTLS_BRANCH=openssl-3.1.8+quic
 ARG NGX_BROTLI_REF=a71f9312c2deb28875acc7bacfdd5695a111aa53
 # Match crowdsecurity/cs-openresty-bouncer's pinned lib version.
 # renovate: datasource=github-tags depName=crowdsecurity/lua-cs-bouncer
-ARG LUA_CS_BOUNCER_VERSION=v1.0.14
+ARG LUA_CS_BOUNCER_VERSION=v1.0.19
 # luarocks versions (X.Y.Z-<rockrev>) — no renovate datasource; refresh from
 # https://luarocks.org/modules/fffonion
 ARG LUA_RESTY_HTTP_VERSION=0.17.1-0
