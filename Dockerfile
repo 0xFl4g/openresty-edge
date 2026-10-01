@@ -18,7 +18,7 @@
 
 # ---- versions (override with --build-arg; CI pins these) --------------------
 # renovate: datasource=github-tags depName=openresty/openresty extractVersion=^v(?<version>.+)$
-ARG RESTY_VERSION=1.27.1.2
+ARG RESTY_VERSION=1.31.1.1
 # quictls: OpenSSL fork carrying the QUIC API. Use the 3.1.x+quic LTS line —
 # it's the canonical, known-to-compile branch for nginx HTTP/3 builds. The
 # 3.3.0+quic branch fails to compile on modern gcc (ssl_quic.c bug) and quictls
