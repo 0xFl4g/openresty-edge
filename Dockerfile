@@ -49,6 +49,7 @@ ARG LUA_CS_BOUNCER_VERSION
 ARG LUA_RESTY_HTTP_VERSION
 ARG LUA_RESTY_ACME_VERSION
 
+# hadolint ignore=DL3018 # apk pins would break on every alpine patch; the base tag is the pin
 RUN apk add --no-cache \
       build-base perl linux-headers \
       pcre2-dev zlib-dev brotli-dev \
@@ -74,6 +75,7 @@ RUN git clone --recurse-submodules --shallow-submodules \
  && git -C ngx_brotli submodule update --init --recursive
 
 # --- OpenResty source --------------------------------------------------------
+# hadolint ignore=DL4006 # build-stage only; a failed curl leaves tar with empty input and fails the build
 RUN curl -fsSL "https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz" \
       | tar -xz
 
@@ -82,6 +84,7 @@ RUN curl -fsSL "https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz
 # --with-http_v3_module enables HTTP/3. ngx_brotli is a *dynamic* module so its
 # .so lands in nginx/modules and consumers opt in via `load_module` — that keeps
 # the image usable by configs that don't want brotli.
+# hadolint ignore=DL3003 # one-shot configure+make chain
 RUN cd "openresty-${RESTY_VERSION}" \
  && ./configure \
       --prefix=/usr/local/openresty \
@@ -145,6 +148,7 @@ FROM alpine:3.22
 # the quictls statically linked at build time for TLS/QUIC; the Lua FFI just
 # needs *a* shared 3.x libcrypto for cert/key parsing. `gettext` provides
 # envsubst (used to template the bouncer config at container start).
+# hadolint ignore=DL3018 # see build stage
 RUN apk add --no-cache \
       pcre2 zlib brotli-libs libstdc++ libgcc \
       openssl ca-certificates \
@@ -157,10 +161,11 @@ COPY --from=build /var/lib/crowdsec   /var/lib/crowdsec
 
 ENV PATH=/usr/local/openresty/luajit/bin:/usr/local/openresty/bin:/usr/local/openresty/nginx/sbin:$PATH
 
-# Build-time smoke test: fail the image if HTTP/3, brotli, or QUIC TLS is
+# Build-time smoke test: fail the image if HTTP/3 (nginx's configure only
+# accepts the v3 module when the TLS library has the QUIC API) or brotli is
 # missing — turns a silently-degraded build into a hard CI failure.
+# hadolint ignore=DL4006 # grep exit status is the test
 RUN openresty -V 2>&1 | grep -q -- '--with-http_v3_module' \
- && openresty -V 2>&1 | grep -qi 'quic' \
  && test -f /usr/local/openresty/nginx/modules/ngx_http_brotli_filter_module.so \
  && test -f /usr/local/openresty/nginx/modules/ngx_http_brotli_static_module.so
 
