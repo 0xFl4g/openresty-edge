@@ -75,4 +75,6 @@ jobs:
           image-ref: local/scan:ci
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          # Skip OpenResty's bundled POD docs (example keys, no runtime use).
+          skip-dirs: /usr/local/openresty/pod
           exit-code: "1"
