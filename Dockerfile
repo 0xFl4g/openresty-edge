@@ -19,6 +19,12 @@
 # ---- versions (override with --build-arg; CI pins these) --------------------
 # renovate: datasource=github-tags depName=openresty/openresty extractVersion=^v(?<version>.+)$
 ARG RESTY_VERSION=1.31.1.1
+# sha256 of openresty-${RESTY_VERSION}.tar.gz. openresty.org publishes only a PGP
+# signature (.asc, signer 25451EB0 88460026 195BD62C B550E09E A0E98066), no checksum
+# file, so this was computed from the official download after verifying that
+# signature. Renovate cannot update it: when bumping RESTY_VERSION, update this too
+# (curl -fsSLO https://openresty.org/download/openresty-<ver>.tar.gz{,.asc}; gpg --verify; sha256sum).
+ARG RESTY_SHA256=65b78baadd3f0984055de89bf13f4a1932e5bfe9c31932037a134ea2b1a0ce42
 # quictls: OpenSSL fork carrying the QUIC API. Use the 3.1.x+quic LTS line —
 # it's the canonical, known-to-compile branch for nginx HTTP/3 builds. The
 # 3.3.0+quic branch fails to compile on modern gcc (ssl_quic.c bug) and quictls
@@ -43,6 +49,7 @@ ARG LUA_RESTY_ACME_VERSION=0.16.0-1
 FROM alpine:3.24 AS build
 
 ARG RESTY_VERSION
+ARG RESTY_SHA256
 ARG QUICTLS_BRANCH
 ARG NGX_BROTLI_REF
 ARG LUA_CS_BOUNCER_VERSION
@@ -75,9 +82,11 @@ RUN git clone --recurse-submodules --shallow-submodules \
  && git -C ngx_brotli submodule update --init --recursive
 
 # --- OpenResty source --------------------------------------------------------
-# hadolint ignore=DL4006 # build-stage only; a failed curl leaves tar with empty input and fails the build
-RUN curl -fsSL "https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz" \
-      | tar -xz
+RUN curl -fsSLo openresty.tar.gz "https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz" \
+ && echo "${RESTY_SHA256}  openresty.tar.gz" > openresty.tar.gz.sha256 \
+ && sha256sum -c openresty.tar.gz.sha256 \
+ && tar -xzf openresty.tar.gz \
+ && rm openresty.tar.gz openresty.tar.gz.sha256
 
 # --- configure + build -------------------------------------------------------
 # --with-openssl builds quictls statically into nginx (gives it the QUIC API).

@@ -117,15 +117,16 @@ A config template is at
 
 | Arg | Default | Notes |
 |-----|---------|-------|
-| `RESTY_VERSION` | `1.27.1.2` | OpenResty release |
+| `RESTY_VERSION` | `1.31.1.1` | OpenResty release |
+| `RESTY_SHA256` | pinned | sha256 of the OpenResty tarball; must be updated together with `RESTY_VERSION` |
 | `QUICTLS_BRANCH` | `openssl-3.1.8+quic` | quictls branch (3.1.x LTS line; 3.3.0+quic fails to compile) |
 | `NGX_BROTLI_REF` | pinned commit | `a71f9312…` — refresh from upstream master |
-| `LUA_CS_BOUNCER_VERSION` | `v1.0.14` | CrowdSec bouncer lib |
+| `LUA_CS_BOUNCER_VERSION` | `v1.0.19` | CrowdSec bouncer lib |
 | `LUA_RESTY_HTTP_VERSION` | `0.17.1-0` | luarocks rock version (matches the bouncer's expectation) |
 | `LUA_RESTY_ACME_VERSION` | `0.16.0-1` | luarocks rock version |
 
 ```bash
-docker build --build-arg RESTY_VERSION=1.27.1.2 -t openresty-edge:local .
+docker build -t openresty-edge:local .
 ```
 
 ## Notes
@@ -135,6 +136,21 @@ docker build --build-arg RESTY_VERSION=1.27.1.2 -t openresty-edge:local .
   per arch; cached rebuilds are faster.
 - **Why third-party**: there's no official OpenResty image with HTTP/3 + Brotli.
   This packages the well-trodden from-source recipe so you don't have to.
+
+## Known limitations / TLS library
+
+nginx is built against quictls 3.1.8, statically linked. That is an end-of-life
+OpenSSL 3.1 line, and because it is linked into the nginx binary rather than
+installed as a package, image scanners (e.g. trivy) cannot see it, so a "0 vulnerabilities"
+scan result does not cover it. Migrating to a maintained QUIC-capable TLS library is a
+deferred major change.
+
+## Upgrade notes
+
+**nginx 1.27 to 1.31** (OpenResty 1.27.1.2 to 1.31.1.1): the bundled nginx moved
+across several releases. Review your configs for directive changes and
+deprecations in the official [nginx CHANGES](https://nginx.org/en/CHANGES) before
+upgrading, and run `openresty -t` against your config.
 
 ## License
 
