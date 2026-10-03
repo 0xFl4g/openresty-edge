@@ -9,7 +9,7 @@ name: build
 # Each architecture is compiled on its OWN native GitHub runner (amd64 on
 # ubuntu-24.04, arm64 on ubuntu-24.04-arm — both free for public repos), then a
 # merge job assembles the multi-arch manifest. No QEMU: emulated from-source
-# OpenResty + quictls compiles are brutally slow. The matrix pushes images by
+# OpenResty compiles are brutally slow. The matrix pushes images by
 # digest (untagged); the manifest gets the tags.
 
 on:
@@ -18,6 +18,7 @@ on:
     tags: ['v*.*.*']
     paths:
       - 'Dockerfile'
+      - 'patches/**'
       - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
