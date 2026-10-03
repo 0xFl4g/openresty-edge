@@ -10,10 +10,12 @@ on:
     branches: [main]
     paths:
       - 'Dockerfile'
+      - 'patches/**'
       - '.github/workflows/test.yml'
   pull_request:
     paths:
       - 'Dockerfile'
+      - 'patches/**'
       - '.github/workflows/test.yml'
   workflow_dispatch:
 
@@ -104,3 +106,28 @@ jobs:
             openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
               -keyout /tmp/t.key -out /tmp/t.crt -subj "/CN=test" 2>/dev/null
             openresty -c /tmp/test.conf -t'
+
+      - name: backported nginx script fixes are in the binary (CVE-2026-42533)
+        run: |
+          # Reproducer from upstream commit a8289aa69c74 (part of the
+          # CVE-2026-42533 series in patches/nginx/): the map regex rewrites
+          # $1 between the script's length and copy passes. Unpatched nginx
+          # returns 6 bytes ("1:1" + 3 bytes of garbage); patched returns "1:1".
+          cat > /tmp/script.conf <<'CONF'
+          worker_processes 1;
+          error_log /dev/stderr warn;
+          pid /tmp/script.pid;
+          events { worker_connections 64; }
+          http {
+            map $uri $foo { ~^/(?<bar>[0-9]).*$ $bar; }
+            server {
+              listen 8080;
+              location ~(?<bar>[0-9]*)[a-z]*$ { return 200 $1:$foo; }
+            }
+          }
+          CONF
+          docker run --rm -v /tmp/script.conf:/tmp/script.conf:ro openresty-edge:test sh -c '
+            openresty -c /tmp/script.conf && sleep 1
+            curl -s http://127.0.0.1:8080/1234abcd > /tmp/body
+            od -c /tmp/body
+            test "$(cat /tmp/body)" = "1:1" && test "$(wc -c < /tmp/body)" -eq 3'

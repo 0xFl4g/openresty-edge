@@ -88,6 +88,18 @@ RUN curl -fsSLo openresty.tar.gz "https://openresty.org/download/openresty-${RES
  && tar -xzf openresty.tar.gz \
  && rm openresty.tar.gz openresty.tar.gz.sha256
 
+# --- nginx security backports ------------------------------------------------
+# OpenResty 1.31.1.1 bundles nginx 1.31.1, which predates the fixes for
+# CVE-2026-42530/42055/48142 (nginx 1.31.2) and CVE-2026-42533/60005/56434
+# (nginx 1.31.3). Each patches/nginx/*.patch names its upstream commits. A patch
+# that doesn't apply fails the build; the hardcoded nginx-1.31.1 path also fails
+# on an OpenResty bump, which is the cue to drop patches the new nginx contains.
+COPY patches/nginx/ /src/patches/nginx/
+RUN for p in /src/patches/nginx/*.patch; do \
+      echo "applying ${p}"; \
+      patch -d "openresty-${RESTY_VERSION}/bundle/nginx-1.31.1" -p1 --forward < "${p}" || exit 1; \
+    done
+
 # --- configure + build -------------------------------------------------------
 # --with-openssl builds quictls statically into nginx (gives it the QUIC API).
 # --with-http_v3_module enables HTTP/3. ngx_brotli is a *dynamic* module so its

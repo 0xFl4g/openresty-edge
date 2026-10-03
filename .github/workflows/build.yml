@@ -18,6 +18,7 @@ on:
     tags: ['v*.*.*']
     paths:
       - 'Dockerfile'
+      - 'patches/**'
       - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
