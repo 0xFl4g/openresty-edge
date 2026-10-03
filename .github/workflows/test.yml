@@ -57,6 +57,14 @@ jobs:
           docker run --rm openresty-edge:test openresty -V 2>&1 | tee /tmp/v.txt
           grep -q -- '--with-http_v3_module' /tmp/v.txt
 
+      - name: nginx uses the system OpenSSL 3.5 (apk), not a static copy
+        run: |
+          grep -q 'built with OpenSSL 3\.5\.' /tmp/v.txt
+          docker run --rm openresty-edge:test sh -c '
+            ldd /usr/local/openresty/nginx/sbin/nginx | grep libssl
+            ldd /usr/local/openresty/nginx/sbin/nginx | grep -q "libssl.so.3 => /usr/lib/libssl.so.3"
+            apk info -e libssl3'
+
       - name: brotli dynamic modules present
         run: |
           docker run --rm openresty-edge:test \

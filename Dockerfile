@@ -9,8 +9,9 @@
 #
 # Why from source: the official openresty/openresty image is NOT compiled with
 # --with-http_v3_module and cannot serve HTTP/3 or load ngx_brotli without a
-# recompile. We build OpenResty against quictls (an OpenSSL fork carrying the
-# QUIC API nginx HTTP/3 needs) and add ngx_brotli as a dynamic module.
+# recompile. We build OpenResty against Alpine's OpenSSL 3.5 LTS (shared
+# libssl.so.3; 3.5.1+ has the QUIC TLS API nginx HTTP/3 uses natively) and add
+# ngx_brotli as a dynamic module.
 #
 # Config-agnostic: bring your own nginx.conf / conf.d / lua via bind mounts or
 # a derived image. See README.md for enabling brotli + HTTP/3 in your config.
@@ -25,13 +26,6 @@ ARG RESTY_VERSION=1.31.1.1
 # signature. Renovate cannot update it: when bumping RESTY_VERSION, update this too
 # (curl -fsSLO https://openresty.org/download/openresty-<ver>.tar.gz{,.asc}; gpg --verify; sha256sum).
 ARG RESTY_SHA256=65b78baadd3f0984055de89bf13f4a1932e5bfe9c31932037a134ea2b1a0ce42
-# quictls: OpenSSL fork carrying the QUIC API. Use the 3.1.x+quic LTS line —
-# it's the canonical, known-to-compile branch for nginx HTTP/3 builds. The
-# 3.3.0+quic branch fails to compile on modern gcc (ssl_quic.c bug) and quictls
-# wound down the 3.3 line in favour of OpenSSL 3.5's native QUIC. nginx's static
-# quictls and the runtime's alpine libcrypto (3.5, for lua-resty-openssl FFI)
-# are independent, so the version skew is fine.
-ARG QUICTLS_BRANCH=openssl-3.1.8+quic
 # ngx_brotli has no recent tagged release — pinned to a commit for reproducible
 # builds. Refresh from https://github.com/google/ngx_brotli/commits/master
 ARG NGX_BROTLI_REF=a71f9312c2deb28875acc7bacfdd5695a111aa53
@@ -50,7 +44,6 @@ FROM alpine:3.24 AS build
 
 ARG RESTY_VERSION
 ARG RESTY_SHA256
-ARG QUICTLS_BRANCH
 ARG NGX_BROTLI_REF
 ARG LUA_CS_BOUNCER_VERSION
 ARG LUA_RESTY_HTTP_VERSION
@@ -59,16 +52,12 @@ ARG LUA_RESTY_ACME_VERSION
 # hadolint ignore=DL3018 # apk pins would break on every alpine patch; the base tag is the pin
 RUN apk add --no-cache \
       build-base perl linux-headers \
-      pcre2-dev zlib-dev brotli-dev \
+      pcre2-dev zlib-dev brotli-dev openssl-dev \
       curl wget git bash ca-certificates \
       readline-dev ncurses-dev \
       luarocks5.1 lua5.1
 
 WORKDIR /src
-
-# --- quictls (QUIC-capable OpenSSL), built statically into nginx -------------
-RUN git clone --depth 1 --branch "${QUICTLS_BRANCH}" \
-      https://github.com/quictls/openssl.git quictls
 
 # --- ngx_brotli -------------------------------------------------------------
 # Needs BOTH: the bundled submodule (ngx_brotli's config hard-requires
@@ -101,10 +90,12 @@ RUN for p in /src/patches/nginx/*.patch; do \
     done
 
 # --- configure + build -------------------------------------------------------
-# --with-openssl builds quictls statically into nginx (gives it the QUIC API).
-# --with-http_v3_module enables HTTP/3. ngx_brotli is a *dynamic* module so its
-# .so lands in nginx/modules and consumers opt in via `load_module` — that keeps
-# the image usable by configs that don't want brotli.
+# No --with-openssl: nginx links the system libssl.so.3 from openssl-dev
+# (Alpine's OpenSSL 3.5 LTS), so security fixes arrive with the alpine base and
+# image scanners see the openssl apk packages. --with-http_v3_module enables
+# HTTP/3. ngx_brotli is a *dynamic* module so its .so lands in nginx/modules and
+# consumers opt in via `load_module` — that keeps the image usable by configs
+# that don't want brotli.
 # hadolint ignore=DL3003 # one-shot configure+make chain
 RUN cd "openresty-${RESTY_VERSION}" \
  && ./configure \
@@ -119,8 +110,6 @@ RUN cd "openresty-${RESTY_VERSION}" \
       --with-http_stub_status_module \
       --with-http_gunzip_module \
       --with-luajit \
-      --with-openssl=/src/quictls \
-      --with-openssl-opt='no-tests' \
       --add-dynamic-module=/src/ngx_brotli \
       -j"$(nproc)" \
  && make -j"$(nproc)" \
@@ -164,10 +153,9 @@ RUN git clone --depth 1 --branch "${LUA_CS_BOUNCER_VERSION}" \
 # =============================================================================
 FROM alpine:3.24
 
-# Runtime libs. `openssl` provides the shared libssl.so.3 / libcrypto.so.3 that
-# lua-resty-openssl FFI-loads (lua-resty-acme depends on it). nginx itself uses
-# the quictls statically linked at build time for TLS/QUIC; the Lua FFI just
-# needs *a* shared 3.x libcrypto for cert/key parsing. `gettext` provides
+# Runtime libs. `openssl` pulls in the shared libssl.so.3 / libcrypto.so.3 that
+# nginx links for TLS/QUIC and that lua-resty-openssl FFI-loads (lua-resty-acme
+# depends on it), so both use the same OpenSSL 3.5. `gettext` provides
 # envsubst (used to template the bouncer config at container start).
 # hadolint ignore=DL3018 # see build stage
 RUN apk add --no-cache \
