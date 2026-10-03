@@ -58,6 +58,24 @@ services:
       - ./conf.d:/etc/openresty/conf.d:ro
 ```
 
+### Running as non-root
+
+The image runs as the unprivileged user `nginx` (**uid/gid 101**), master and
+workers alike, and still listens on 80/443:
+
+- **Bind-mounted files must be accessible to uid 101.** Certificates and keys
+  must be readable (a `0600` key owned by your host user is not:
+  `chmod 644 key.pem` or `chown 101:101 key.pem`), and ACME storage or any other
+  writable volume (lua-resty-acme file storage, a rendered CrowdSec config) must
+  be writable by uid 101.
+- **Drop any `user` directive** from your `nginx.conf`: a non-root master can't
+  switch users and ignores it with a warning.
+- **Ports 80/443:** plain Docker/Compose allow non-root binds to ports < 1024
+  (Docker sets `net.ipv4.ip_unprivileged_port_start=0` in the container's network
+  namespace). On Kubernetes or other runtimes that don't, either set that sysctl
+  via the pod's `securityContext.sysctls`, or listen on 8080/8443 in your config
+  and map the ports.
+
 ### Enabling Brotli
 
 `ngx_brotli` is a **dynamic** module — load it at the top of `nginx.conf`

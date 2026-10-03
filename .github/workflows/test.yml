@@ -139,3 +139,27 @@ jobs:
             curl -s http://127.0.0.1:8080/1234abcd > /tmp/body
             od -c /tmp/body
             test "$(cat /tmp/body)" = "1:1" && test "$(wc -c < /tmp/body)" -eq 3'
+
+      - name: runs as non-root (uid 101) and serves the example config on 443
+        run: |
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -keyout /tmp/key.pem -out /tmp/cert.pem -subj "/CN=localhost" 2>/dev/null
+          chmod 644 /tmp/key.pem   # bind-mounted key must be readable by uid 101
+          docker run -d --name edge-nonroot \
+            -v "$PWD/examples/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro" \
+            -v /tmp/cert.pem:/etc/openresty/cert.pem:ro \
+            -v /tmp/key.pem:/etc/openresty/key.pem:ro \
+            openresty-edge:test
+          sleep 2
+          docker logs edge-nonroot
+          docker exec edge-nonroot ps -o user,args | tee /tmp/ps.txt
+          test "$(docker exec edge-nonroot id -u)" = 101
+          grep -q 'nginx: master' /tmp/ps.txt && grep -q 'nginx: worker' /tmp/ps.txt
+          if grep 'nginx: ' /tmp/ps.txt | grep -qv '^nginx '; then
+            echo "an nginx process is not running as user nginx"; exit 1
+          fi
+          docker exec edge-nonroot curl -skf https://127.0.0.1/
+          if docker logs edge-nonroot 2>&1 | grep -E 'Permission denied|\[(emerg|alert|crit)\]'; then
+            exit 1
+          fi
+          docker rm -f edge-nonroot

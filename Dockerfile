@@ -168,6 +168,18 @@ COPY --from=build /usr/local/openresty /usr/local/openresty
 COPY --from=build /etc/crowdsec       /etc/crowdsec
 COPY --from=build /var/lib/crowdsec   /var/lib/crowdsec
 
+# Unprivileged runtime user, uid/gid 101 (same as the official nginx images).
+# The master runs as this user, so the paths nginx writes must be owned by it:
+# pid/log dirs, the prefix's default logs/ and *_temp dirs (pre-created; a
+# non-root master can't chown them at startup), and the CrowdSec bouncer config
+# dir (the template is rendered there at container start).
+RUN addgroup -S -g 101 nginx \
+ && adduser -S -D -H -u 101 -G nginx -h /var/empty -s /sbin/nologin nginx \
+ && n=/usr/local/openresty/nginx \
+ && mkdir -p "$n/client_body_temp" "$n/proxy_temp" "$n/fastcgi_temp" "$n/uwsgi_temp" "$n/scgi_temp" \
+ && chown -R 101:101 "$n/logs" "$n/client_body_temp" "$n/proxy_temp" "$n/fastcgi_temp" \
+      "$n/uwsgi_temp" "$n/scgi_temp" /var/run/openresty /var/log/openresty /etc/crowdsec/bouncers
+
 ENV PATH=/usr/local/openresty/luajit/bin:/usr/local/openresty/bin:/usr/local/openresty/nginx/sbin:$PATH
 
 # Build-time smoke test: fail the image if HTTP/3 (nginx's configure only
@@ -178,6 +190,9 @@ RUN openresty -V 2>&1 | grep -q -- '--with-http_v3_module' \
  && test -f /usr/local/openresty/nginx/modules/ngx_http_brotli_filter_module.so \
  && test -f /usr/local/openresty/nginx/modules/ngx_http_brotli_static_module.so
 
+# Ports stay 80/443: Docker sets net.ipv4.ip_unprivileged_port_start=0 in the
+# container's network namespace, so uid 101 can bind them (see README for k8s).
+USER 101:101
 STOPSIGNAL SIGQUIT
 EXPOSE 80 443 443/udp
 CMD ["openresty", "-g", "daemon off;"]
