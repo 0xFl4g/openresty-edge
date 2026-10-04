@@ -1,7 +1,7 @@
 # openresty-edge
 
-Docker image: OpenResty built from source with HTTP/3 (quictls), Brotli
-(dynamic module), lua-resty-acme, and the CrowdSec bouncer. Published to
+Docker image: OpenResty built from source with HTTP/3 (Alpine's OpenSSL 3.5),
+Brotli (dynamic module), lua-resty-acme, and the CrowdSec bouncer. Published to
 `ghcr.io/0xfl4g/openresty-edge`. No app code — just `Dockerfile`, two
 workflows, and `examples/`.
 
@@ -19,9 +19,17 @@ if HTTP/3/QUIC/brotli are missing.
 
 - `RESTY_VERSION`, `LUA_CS_BOUNCER_VERSION`, base `alpine` images:
   Renovate-tracked (regex manager reads the `# renovate:` ARG comments).
-- `QUICTLS_BRANCH`: manual, stay on the 3.1.x+quic LTS line — 3.3.0+quic
-  does not compile (see Dockerfile comment). Revisit only for OpenSSL 3.5
-  native QUIC migration.
+- OpenSSL: not pinned — nginx links Alpine's shared `libssl.so.3` (openssl-dev
+  at build, openssl at runtime), so it moves with the `alpine` base tag. Keep the
+  base on a release that ships OpenSSL 3.5.x (LTS to 2030-04; 3.5.1+ is needed
+  for nginx's native QUIC API and 0-RTT).
+- `patches/nginx/*.patch`: nginx security backports (CVE fixes from nginx
+  1.31.2/1.31.3) applied to the tarball's `bundle/nginx-1.31.1`. **Drop them
+  when OpenResty ships nginx >= 1.31.3** (the Dockerfile's hardcoded
+  `nginx-1.31.1` path fails the build on any RESTY_VERSION bump as a reminder).
+  Each file's header lists its upstream commits and any adaptation.
+  CVE-2026-90439 (nginx 1.31.6) is not backported: its code is only compiled
+  for the OpenSSL < 3.5.1 compat layer (`NGX_QUIC_OPENSSL_COMPAT`), not 3.5.x.
 - `NGX_BROTLI_REF`: manual commit pin — upstream doesn't tag releases.
 - `LUA_RESTY_HTTP_VERSION` / `LUA_RESTY_ACME_VERSION`: luarocks rock
   versions (`X.Y.Z-rev`), no Renovate datasource — refresh manually from
@@ -33,7 +41,7 @@ if HTTP/3/QUIC/brotli are missing.
 ## Releases
 
 - Push to `main` → `:edge`, `:edge-<sha>` (build.yml, paths-filtered to
-  Dockerfile/workflow).
+  Dockerfile/patches/workflow).
 - Tag `vX.Y.Z` → `:X.Y.Z`, `:X.Y`, `:X`, `:latest`.
 - Each arch builds on its own native runner; no QEMU. test.yml shares the
   `linux-amd64` GHA cache scope with build.yml — keep them in sync.

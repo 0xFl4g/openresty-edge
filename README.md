@@ -20,7 +20,7 @@ batteries most edge deployments end up wanting anyway:
 
 | Component | What you get |
 |-----------|--------------|
-| **HTTP/3 / QUIC** | `--with-http_v3_module`, built against [quictls](https://github.com/quictls/openssl) |
+| **HTTP/3 / QUIC** | `--with-http_v3_module`, linked against Alpine's OpenSSL 3.5 LTS (`libssl.so.3`) |
 | **Brotli** | [`ngx_brotli`](https://github.com/google/ngx_brotli) as a dynamic module (opt-in via `load_module`) |
 | **ACME / Let's Encrypt** | [`lua-resty-acme`](https://github.com/fffonion/lua-resty-acme) (HTTP-01 + DNS-01, Redis/file storage) |
 | **WAF** | [CrowdSec OpenResty bouncer](https://github.com/crowdsecurity/lua-cs-bouncer) (`require "crowdsec"`) |
@@ -57,6 +57,24 @@ services:
       - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
       - ./conf.d:/etc/openresty/conf.d:ro
 ```
+
+### Running as non-root
+
+The image runs as the unprivileged user `nginx` (**uid/gid 101**), master and
+workers alike, and still listens on 80/443:
+
+- **Bind-mounted files must be accessible to uid 101.** Certificates and keys
+  must be readable (a `0600` key owned by your host user is not:
+  `chmod 644 key.pem` or `chown 101:101 key.pem`), and ACME storage or any other
+  writable volume (lua-resty-acme file storage, a rendered CrowdSec config) must
+  be writable by uid 101.
+- **Drop any `user` directive** from your `nginx.conf`: a non-root master can't
+  switch users and ignores it with a warning.
+- **Ports 80/443:** plain Docker/Compose allow non-root binds to ports < 1024
+  (Docker sets `net.ipv4.ip_unprivileged_port_start=0` in the container's network
+  namespace). On Kubernetes or other runtimes that don't, either set that sysctl
+  via the pod's `securityContext.sysctls`, or listen on 8080/8443 in your config
+  and map the ports.
 
 ### Enabling Brotli
 
@@ -119,7 +137,6 @@ A config template is at
 |-----|---------|-------|
 | `RESTY_VERSION` | `1.31.1.1` | OpenResty release |
 | `RESTY_SHA256` | pinned | sha256 of the OpenResty tarball; must be updated together with `RESTY_VERSION` |
-| `QUICTLS_BRANCH` | `openssl-3.1.8+quic` | quictls branch (3.1.x LTS line; 3.3.0+quic fails to compile) |
 | `NGX_BROTLI_REF` | pinned commit | `a71f9312…` — refresh from upstream master |
 | `LUA_CS_BOUNCER_VERSION` | `v1.0.19` | CrowdSec bouncer lib |
 | `LUA_RESTY_HTTP_VERSION` | `0.17.1-0` | luarocks rock version (matches the bouncer's expectation) |
@@ -131,7 +148,7 @@ docker build -t openresty-edge:local .
 
 ## Notes
 
-- **Build time**: this is a from-source OpenResty + quictls compile. CI builds
+- **Build time**: this is a from-source OpenResty compile. CI builds
   each arch on its own native GitHub runner (amd64 + arm64, no QEMU) — ~4 min
   per arch; cached rebuilds are faster.
 - **Why third-party**: there's no official OpenResty image with HTTP/3 + Brotli.
@@ -139,11 +156,12 @@ docker build -t openresty-edge:local .
 
 ## Known limitations / TLS library
 
-nginx is built against quictls 3.1.8, statically linked. That is an end-of-life
-OpenSSL 3.1 line, and because it is linked into the nginx binary rather than
-installed as a package, image scanners (e.g. trivy) cannot see it, so a "0 vulnerabilities"
-scan result does not cover it. Migrating to a maintained QUIC-capable TLS library is a
-deferred major change.
+nginx is linked dynamically against Alpine's OpenSSL 3.5 LTS (`openssl` /
+`libssl3` apk packages), so image scanners see it and fixes arrive with the
+alpine base. OpenResty's OpenSSL patches are not applied, so
+`ssl_session_fetch_by_lua*` (yielding session-ID lookup) is unsupported; per the
+lua-nginx-module docs, `ssl_certificate_by_lua*` and `ssl_client_hello_by_lua*`
+don't need those patches.
 
 ## Upgrade notes
 
