@@ -28,12 +28,25 @@ env:
 
 jobs:
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # Forgejo's medusa runner: the Docker daemon is DinD and the job workspace is a volume it cannot see, so
+      # files handed to `docker run -v` must live in /ci-shared (the same path in the job and in DinD).
+      # GitHub (no /ci-shared): the workspace and /tmp, as before.
+      - name: Workspace the Docker daemon can see
+        run: |
+          d=$GITHUB_WORKSPACE
+          if [ -d /ci-shared ]; then
+            d=/ci-shared/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB; rm -rf "$d"; mkdir -p "$d/tmp"
+            cp -a "$GITHUB_WORKSPACE/." "$d/"
+            echo "TMPDIR=$d/tmp" >> "$GITHUB_ENV"
+          fi
+          echo "CI_WORKDIR=$d" >> "$GITHUB_ENV"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -50,14 +63,16 @@ jobs:
           # Same scope as build.yml's amd64 leg so the smoke test reuses (and
           # warms) the release build's layer cache instead of recompiling.
           cache-from: type=gha,scope=linux-amd64
-          cache-to: type=gha,mode=max,scope=linux-amd64
+          cache-to: type=gha,mode=max,scope=linux-amd64,ignore-error=true
 
       - name: openresty -V shows HTTP/3
+        working-directory: ${{ env.CI_WORKDIR }}
         run: |
           docker run --rm openresty-edge:test openresty -V 2>&1 | tee /tmp/v.txt
           grep -q -- '--with-http_v3_module' /tmp/v.txt
 
       - name: nginx uses the system OpenSSL 3.5 (apk), not a static copy
+        working-directory: ${{ env.CI_WORKDIR }}
         run: |
           grep -q 'built with OpenSSL 3\.5\.' /tmp/v.txt
           docker run --rm openresty-edge:test sh -c '
@@ -66,11 +81,13 @@ jobs:
             apk info -e libssl3'
 
       - name: brotli dynamic modules present
+        working-directory: ${{ env.CI_WORKDIR }}
         run: |
           docker run --rm openresty-edge:test \
             sh -c 'ls -1 /usr/local/openresty/nginx/modules/ngx_http_brotli_*.so'
 
       - name: baked Lua libraries require cleanly
+        working-directory: ${{ env.CI_WORKDIR }}
         run: |
           # resty CLI default path includes site/lualib (where we copied the
           # rocks) + lualib. crowdsec lives under lualib/plugins/crowdsec, so
@@ -85,8 +102,9 @@ jobs:
             -e 'require("crowdsec"); print("crowdsec lib OK")'
 
       - name: config with brotli + HTTP/3 passes nginx -t
+        working-directory: ${{ env.CI_WORKDIR }}
         run: |
-          cat > /tmp/test.conf <<'CONF'
+          cat > "${TMPDIR:-/tmp}/test.conf" <<'CONF'
           worker_processes 1;
           error_log /dev/stderr warn;
           pid /var/run/openresty/nginx.pid;
@@ -110,18 +128,19 @@ jobs:
           # No -p: use the compiled default prefix (/usr/local/openresty/nginx),
           # so `load_module modules/...` resolves to nginx/modules/ where the
           # brotli .so lives — same path real consumer configs use.
-          docker run --rm -v /tmp/test.conf:/tmp/test.conf:ro openresty-edge:test sh -c '
+          docker run --rm -v "${TMPDIR:-/tmp}/test.conf:/tmp/test.conf:ro" openresty-edge:test sh -c '
             openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
               -keyout /tmp/t.key -out /tmp/t.crt -subj "/CN=test" 2>/dev/null
             openresty -c /tmp/test.conf -t'
 
       - name: backported nginx script fixes are in the binary (CVE-2026-42533)
+        working-directory: ${{ env.CI_WORKDIR }}
         run: |
           # Reproducer from upstream commit a8289aa69c74 (part of the
           # CVE-2026-42533 series in patches/nginx/): the map regex rewrites
           # $1 between the script's length and copy passes. Unpatched nginx
           # returns 6 bytes ("1:1" + 3 bytes of garbage); patched returns "1:1".
-          cat > /tmp/script.conf <<'CONF'
+          cat > "${TMPDIR:-/tmp}/script.conf" <<'CONF'
           worker_processes 1;
           error_log /dev/stderr warn;
           pid /tmp/script.pid;
@@ -134,21 +153,22 @@ jobs:
             }
           }
           CONF
-          docker run --rm -v /tmp/script.conf:/tmp/script.conf:ro openresty-edge:test sh -c '
+          docker run --rm -v "${TMPDIR:-/tmp}/script.conf:/tmp/script.conf:ro" openresty-edge:test sh -c '
             openresty -c /tmp/script.conf && sleep 1
             curl -s http://127.0.0.1:8080/1234abcd > /tmp/body
             od -c /tmp/body
             test "$(cat /tmp/body)" = "1:1" && test "$(wc -c < /tmp/body)" -eq 3'
 
       - name: runs as non-root (uid 101) and serves the example config on 443
+        working-directory: ${{ env.CI_WORKDIR }}
         run: |
           openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-            -keyout /tmp/key.pem -out /tmp/cert.pem -subj "/CN=localhost" 2>/dev/null
-          chmod 644 /tmp/key.pem   # bind-mounted key must be readable by uid 101
+            -keyout "${TMPDIR:-/tmp}/key.pem" -out "${TMPDIR:-/tmp}/cert.pem" -subj "/CN=localhost" 2>/dev/null
+          chmod 644 "${TMPDIR:-/tmp}/key.pem"   # bind-mounted key must be readable by uid 101
           docker run -d --name edge-nonroot \
             -v "$PWD/examples/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro" \
-            -v /tmp/cert.pem:/etc/openresty/cert.pem:ro \
-            -v /tmp/key.pem:/etc/openresty/key.pem:ro \
+            -v "${TMPDIR:-/tmp}/cert.pem:/etc/openresty/cert.pem:ro" \
+            -v "${TMPDIR:-/tmp}/key.pem:/etc/openresty/key.pem:ro" \
             openresty-edge:test
           sleep 2
           docker logs edge-nonroot
@@ -163,3 +183,13 @@ jobs:
             exit 1
           fi
           docker rm -f edge-nonroot
+
+      # The homelab runner shares one Docker daemon across jobs: a failed run must not leave the name taken.
+      - name: Remove the non-root test container
+        if: always()
+        run: docker rm -f edge-nonroot >/dev/null 2>&1 || true
+
+      - name: Remove the shared copy
+        if: always() && startsWith(env.CI_WORKDIR, '/ci-shared/')
+        run: rm -rf "$CI_WORKDIR"
+
