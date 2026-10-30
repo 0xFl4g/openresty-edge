@@ -24,10 +24,12 @@ if HTTP/3/QUIC/brotli are missing.
   base on a release that ships OpenSSL 3.5.x (LTS to 2030-04; 3.5.1+ is needed
   for nginx's native QUIC API and 0-RTT).
 - `patches/nginx/*.patch`: nginx security backports (CVE fixes from nginx
-  1.31.2/1.31.3) applied to the tarball's `bundle/nginx-1.31.1`. **Drop them
-  when OpenResty ships nginx >= 1.31.3** (the Dockerfile's hardcoded
+  1.31.2/1.31.3/1.31.7) applied to the tarball's `bundle/nginx-1.31.1`. **Drop
+  them when OpenResty ships nginx >= 1.31.7** (the Dockerfile's hardcoded
   `nginx-1.31.1` path fails the build on any RESTY_VERSION bump as a reminder).
-  Each file's header lists its upstream commits and any adaptation.
+  Each file's header lists its upstream commits, any adaptation, and the nginx
+  version that makes it droppable. CVE-2026-93479.patch depends on
+  CVE-2026-42533.patch (it fixes a regression from that series).
   CVE-2026-90439 (nginx 1.31.6) is not backported: its code is only compiled
   for the OpenSSL < 3.5.1 compat layer (`NGX_QUIC_OPENSSL_COMPAT`), not 3.5.x.
 - `NGX_BROTLI_REF`: manual commit pin — upstream doesn't tag releases.
