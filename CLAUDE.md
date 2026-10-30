@@ -38,6 +38,12 @@ if HTTP/3/QUIC/brotli are missing.
   risky bit is libcrypto major changes hitting the lua-resty-openssl FFI —
   verify `require("resty.openssl.x509")` after any bump.
 
+## Where this repo lives
+
+Primary: Forgejo `https://forgejo.sol.fedra.cc/0xfl4g/openresty-edge` (`origin`); GitHub is a push mirror Forgejo
+updates on every commit — never push to GitHub directly. GitHub Actions stays on here: GitHub publishes the
+multi-arch image to GHCR (native arm64 runners). On Forgejo, test.yml and security.yml build and check amd64.
+
 ## Releases
 
 - Push to `main` → `:edge`, `:edge-<sha>` (build.yml, paths-filtered to

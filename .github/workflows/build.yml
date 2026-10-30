@@ -39,6 +39,8 @@ env:
 
 jobs:
   build:
+    # Publishing is GitHub's job (GHCR, native arm64 runners); Forgejo builds and tests via test.yml.
+    if: github.server_url == 'https://github.com'
     strategy:
       fail-fast: false
       matrix:
@@ -105,6 +107,8 @@ jobs:
           retention-days: 1
 
   merge:
+    # Publishing is GitHub's job (GHCR, native arm64 runners); Forgejo builds and tests via test.yml.
+    if: github.server_url == 'https://github.com'
     needs: build
     runs-on: ubuntu-24.04
     permissions:
