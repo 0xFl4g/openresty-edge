@@ -184,6 +184,11 @@ jobs:
           fi
           docker rm -f edge-nonroot
 
+      # The homelab runner shares one Docker daemon across jobs: a failed run must not leave the name taken.
+      - name: Remove the non-root test container
+        if: always()
+        run: docker rm -f edge-nonroot >/dev/null 2>&1 || true
+
       - name: Remove the shared copy
         if: always() && startsWith(env.CI_WORKDIR, '/ci-shared/')
         run: rm -rf "$CI_WORKDIR"
